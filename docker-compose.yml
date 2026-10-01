@@ -1,0 +1,19 @@
+# Local development database only. If you have a MongoDB Atlas cluster instead, set
+# MONGO_URI=mongodb+srv://... in backend/.env and skip this service entirely.
+services:
+  db:
+    image: mongo:7
+    container_name: crowdsentry-db
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mongodata:

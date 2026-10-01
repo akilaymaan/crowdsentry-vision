@@ -1,0 +1,125 @@
+.map-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.map {
+  flex: 1;
+  min-height: 18rem;
+  padding: 0.5rem;
+  display: grid;
+  place-items: center;
+}
+
+.map__svg {
+  width: 100%;
+  height: 100%;
+  max-height: 30rem;
+  display: block;
+}
+
+/* Markers ---------------------------------------------------------------- */
+
+.marker {
+  cursor: pointer;
+}
+
+.marker:focus {
+  outline: none;
+}
+
+.marker:focus-visible .marker__disc {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+/* Pop entrance for every marker, staggered left-to-right. The transform has to go on
+ * a wrapper inside the positioned <g> — a CSS transform there would override the
+ * translate that puts the marker on the map. */
+.marker__pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: marker-in 0.5s var(--ease-spring) backwards;
+  animation-delay: calc(var(--mi, 0) * 70ms);
+}
+
+@keyframes marker-in {
+  from { transform: scale(0.3); opacity: 0; }
+}
+
+.marker__disc {
+  fill: color-mix(in srgb, var(--marker) 22%, transparent);
+  stroke: var(--marker);
+  stroke-width: 2;
+  transition: fill 0.25s, r 0.35s ease-out;
+}
+
+.marker:not(.marker--stale) .marker__disc {
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--marker) 45%, transparent));
+}
+
+.marker:hover .marker__disc {
+  fill: color-mix(in srgb, var(--marker) 38%, transparent);
+}
+
+.marker__core {
+  fill: var(--marker);
+  transition: r 0.35s ease-out;
+}
+
+.marker__halo {
+  fill: none;
+  stroke: var(--marker);
+  stroke-width: 2;
+  opacity: 0.5;
+  /* Without fill-box, scale() would use the SVG viewport's origin and the ping would
+   * fly across the map instead of expanding around the marker. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: marker-ping 2s ease-out infinite;
+}
+
+@keyframes marker-ping {
+  0% { transform: scale(0.75); opacity: 0.6; }
+  80% { transform: scale(1.25); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.marker__select-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  opacity: 0.9;
+  /* Marching ants: the dash pattern is 5+4=9 long, so -9 loops seamlessly. */
+  animation: ring-march 1.2s linear infinite;
+}
+
+@keyframes ring-march {
+  to { stroke-dashoffset: -9; }
+}
+
+.marker__count {
+  fill: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.marker__label {
+  fill: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.marker__sub {
+  fill: var(--text-faint);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.marker--stale {
+  opacity: 0.45;
+}

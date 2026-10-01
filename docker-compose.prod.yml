@@ -1,0 +1,53 @@
+# Production deployment: API + dashboard, built from source. The database is an
+# external MongoDB (Atlas or otherwise) reached via MONGO_URI.
+#
+#     MONGO_URI=mongodb+srv://... API_KEY=... docker compose -f docker-compose.prod.yml up -d --build
+#
+# Required environment:
+#   MONGO_URI           full MongoDB connection string incl. credentials and db name,
+#                       e.g. mongodb+srv://user:pass@cluster.mongodb.net/crowdsentry
+#   API_KEY             shared API key; also baked into the dashboard build so the
+#                       browser can authenticate (python -c "import secrets;
+#                       print(secrets.token_urlsafe(32))")
+# Optional:
+#   MONGO_DB            database name when it is not the URI's path component
+#   CORS_ORIGINS        comma-separated origins allowed to call the API.
+#                       Defaults to the web origin on WEB_PORT.
+#   TRUSTED_HOSTS       comma-separated Host headers the API will serve.
+#   WEB_PORT            host port for the dashboard (default 80)
+#   REALTIME_ENABLED    "false" makes the API a pure-REST instance with no camera
+#                       workers; run ONE realtime-enabled instance at a time.
+
+services:
+  api:
+    build: ./backend
+    container_name: crowdsentry-api
+    restart: unless-stopped
+    environment:
+      MONGO_URI: ${MONGO_URI:?MONGO_URI is required}
+      MONGO_DB: ${MONGO_DB:-crowdsentry}
+      API_KEY: ${API_KEY:?API_KEY is required}
+      API_DOCS_ENABLED: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
+      REALTIME_ENABLED: ${REALTIME_ENABLED:-true}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    # Not published: the web service proxies to it over the internal network.
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the JS bundle; the same shared key the API requires.
+        VITE_API_KEY: ${API_KEY:?API_KEY is required}
+    container_name: crowdsentry-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_started

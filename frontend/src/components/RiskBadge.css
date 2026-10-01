@@ -1,0 +1,49 @@
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--badge-fg);
+  border-radius: 999px;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  /* Level changes crossfade rather than snapping. */
+  transition: color 0.3s, background-color 0.3s, border-color 0.3s;
+}
+
+.risk-badge--lg {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.risk-badge--sm {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.62rem;
+}
+
+.risk-badge__dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--badge-fg);
+  flex: none;
+}
+
+.risk-badge--critical .risk-badge__dot {
+  animation: badge-alarm 1.2s ease-in-out infinite;
+}
+
+@keyframes badge-alarm {
+  50% { transform: scale(0.55); opacity: 0.5; }
+}
+
+.risk-badge__score {
+  padding-left: 0.4rem;
+  border-left: 1px solid color-mix(in srgb, var(--badge-fg) 40%, transparent);
+  font-weight: 600;
+  opacity: 0.95;
+}

@@ -1,0 +1,105 @@
+{
+  "created_at": "2026-09-02T21:23:53.004586+00:00",
+  "feature_names": [
+    "density",
+    "density_rate_of_change",
+    "mean_flow_speed",
+    "flow_direction_variance",
+    "optical_flow_entropy",
+    "stop_ratio",
+    "historical_deviation"
+  ],
+  "risk_levels": [
+    "LOW",
+    "MODERATE",
+    "HIGH",
+    "CRITICAL"
+  ],
+  "level_score_anchors": [
+    12.5,
+    37.5,
+    62.5,
+    87.5
+  ],
+  "best_iteration": 39,
+  "params": {
+    "objective": "multi:softprob",
+    "num_class": 4,
+    "max_depth": 5,
+    "eta": 0.07,
+    "subsample": 0.85,
+    "colsample_bytree": 0.85,
+    "min_child_weight": 3,
+    "seed": 42
+  },
+  "dataset": {
+    "path": "data\\simulated\\crowd_windows.csv",
+    "windows": 2400,
+    "scenarios": 400,
+    "class_counts": {
+      "LOW": 909,
+      "MODERATE": 575,
+      "HIGH": 472,
+      "CRITICAL": 444
+    }
+  },
+  "split": {
+    "strategy": "GroupShuffleSplit by scenario_id (60/20/20)",
+    "train_windows": 1440,
+    "validation_windows": 480,
+    "test_windows": 480
+  },
+  "metrics": {
+    "train": {
+      "accuracy": 0.9881944444444445,
+      "macro_f1": 0.9860981304450644,
+      "weighted_f1": 0.9881714117711964
+    },
+    "validation": {
+      "accuracy": 0.9708333333333333,
+      "macro_f1": 0.9655081003745758,
+      "weighted_f1": 0.9706826747518648
+    },
+    "test": {
+      "accuracy": 0.9645833333333333,
+      "macro_f1": 0.9529798503302002,
+      "weighted_f1": 0.9644590502066531
+    }
+  },
+  "per_class_validation": {
+    "LOW": {
+      "precision": 0.9884393063583815,
+      "recall": 0.9941860465116279,
+      "f1": 0.991304347826087,
+      "support": 172
+    },
+    "MODERATE": {
+      "precision": 0.9357142857142857,
+      "recall": 0.9703703703703703,
+      "f1": 0.9527272727272728,
+      "support": 135
+    },
+    "HIGH": {
+      "precision": 0.9565217391304348,
+      "recall": 0.8918918918918919,
+      "f1": 0.9230769230769231,
+      "support": 74
+    },
+    "CRITICAL": {
+      "precision": 1.0,
+      "recall": 0.98989898989899,
+      "f1": 0.9949238578680203,
+      "support": 99
+    }
+  },
+  "feature_importance": {
+    "density": 0.5457120276301894,
+    "density_rate_of_change": 0.014885510994360248,
+    "mean_flow_speed": 0.057733985009986805,
+    "flow_direction_variance": 0.07893426968085007,
+    "optical_flow_entropy": 0.15652807561380186,
+    "stop_ratio": 0.04292492700407673,
+    "historical_deviation": 0.1032812040667348
+  },
+  "training_data": "simulated (social-force model, Fruin LOS labels)"
+}

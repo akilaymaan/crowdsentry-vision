@@ -1,0 +1,13 @@
+# Development and test dependencies. Install on top of requirements.txt:
+#
+#     pip install -r requirements.txt -r requirements-dev.txt
+#
+# Nothing here ships in the production image.
+
+-r requirements.txt
+
+pytest==8.3.4
+# Required by fastapi.testclient (starlette's TestClient is built on it).
+httpx==0.28.1
+# WebSocket client, for exercising /ws/live end to end.
+websockets==17.1

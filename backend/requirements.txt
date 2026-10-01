@@ -1,0 +1,31 @@
+# --- Web / API ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.5
+pydantic-settings==2.7.1
+
+# --- Persistence ---
+# MongoDB (Atlas in production, the compose service locally). No ORM: documents are
+# plain dicts, serialised by the dataclasses in app/models.py.
+pymongo==4.10.1
+
+# --- Computer vision / detection & tracking ---
+opencv-python==4.11.0.86
+ultralytics==8.3.63
+# Linear-assignment solver used by ByteTrack. Ultralytics treats it as optional and
+# tries to auto-install it on first use -- which can land in the wrong interpreter, so
+# it is pinned here instead.
+lap==0.5.13
+
+# --- Numerics / spatio-temporal analysis ---
+numpy==2.1.3
+scipy==1.15.1
+
+# --- Predictive risk modelling ---
+scikit-learn==1.6.1
+xgboost==2.1.3
+pandas==2.2.3
+matplotlib==3.10.0
+
+# Test-only dependencies live in requirements-dev.txt so production installs and
+# images stay lean.
