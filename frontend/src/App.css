@@ -31,32 +31,6 @@
 
 /* Boot / error states ------------------------------------------------------ */
 
-.boot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  min-height: 100vh;
-  padding: 2rem;
-  text-align: center;
-  color: var(--text-dim);
-}
-
-.boot > * {
-  animation: boot-in 0.5s var(--ease-out) backwards;
-}
-
-.boot > *:nth-child(2) {
-  animation-delay: 0.08s;
-}
-.boot > *:nth-child(3) {
-  animation-delay: 0.16s;
-}
-.boot > *:nth-child(4) {
-  animation-delay: 0.24s;
-}
-
 @keyframes boot-in {
   from {
     opacity: 0;
@@ -64,73 +38,10 @@
   }
 }
 
-.boot__spinner {
-  position: relative;
-  width: 2.2rem;
-  height: 2.2rem;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
-}
-
-.boot__spinner::after {
-  content: '';
-  position: absolute;
-  inset: 0.32rem;
-  border: 2px solid transparent;
-  border-bottom-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 1.5s linear infinite reverse;
-}
-
 @keyframes spin {
   to {
     transform: rotate(360deg);
   }
-}
-
-.boot--error h2 {
-  font-size: 1.15rem;
-  color: var(--critical);
-}
-
-.boot__hint {
-  margin: 0;
-  padding: 0.9rem 1.1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  text-align: left;
-  white-space: pre;
-  overflow-x: auto;
-}
-
-.boot__retry {
-  padding: 0.45rem 1.1rem;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--accent-dim);
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-
-.boot__retry {
-  transition:
-    background 0.15s,
-    transform 0.1s;
-}
-
-.boot__retry:hover {
-  background: color-mix(in srgb, var(--accent) 25%, transparent);
-}
-
-.boot__retry:active {
-  transform: scale(0.96);
 }
 
 .detail-loading {

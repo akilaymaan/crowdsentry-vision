@@ -16,7 +16,7 @@ import { X } from 'lucide-react'
 import RiskBadge from './RiskBadge'
 import AlertCenter from './AlertCenter'
 import { HistoryChart } from './Analytics'
-import { CameraFeed, SectionHeader } from './ConsoleUI'
+import { CameraFeed, RangePicker, SectionHeader } from './ConsoleUI'
 import { api } from '../api/client'
 import { useResource } from '../hooks/useResource'
 import { formatAgo, formatDensity, formatTime, isFresh, riskColors } from '../lib/risk'
@@ -212,20 +212,7 @@ export default function CameraDetail({
 
         <div className="detail__chart-head">
           <span className="detail__chart-title">Density &amp; risk over time</span>
-          <div className="range-picker">
-            {RANGES.map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                className={`range-picker__btn ${
-                  option.label === range.label ? 'range-picker__btn--on' : ''
-                }`}
-                onClick={() => setRange(option)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <RangePicker options={RANGES} value={range} onChange={setRange} />
         </div>
 
         <div className="detail__chart">

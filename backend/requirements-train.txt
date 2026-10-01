@@ -1,0 +1,12 @@
+# Model-training toolchain, used by app/ml/train_risk_model.py and
+# scripts/simulate_crowd_scenarios.py only. Install on top of requirements.txt:
+#
+#     pip install -r requirements.txt -r requirements-train.txt
+#
+# Nothing here ships in the production image.
+
+-r requirements.txt
+
+pandas==2.2.3
+scikit-learn==1.6.1
+matplotlib==3.10.0

@@ -15,7 +15,6 @@ const DISPLAY_BASE = BASE || (import.meta.env.DEV ? 'the Vite dev proxy' : 'this
 // Empty means the backend has auth disabled -- the local-dev configuration.
 const API_KEY = import.meta.env.VITE_API_KEY ?? ''
 
-export const API_BASE = BASE
 
 /** ws:// or wss:// URL for the live feed, derived from the API base. */
 export function liveSocketUrl() {
@@ -89,7 +88,7 @@ export const api = {
     return request(`/api/cameras/${id}/history?${params}`, { signal })
   },
 
-  openAlerts: (signal) => request('/api/alerts?acknowledged=false&limit=50', { signal }),
+  openAlerts: (signal) => api.alerts({ acknowledged: false }, signal),
 
   acknowledgeAlert: (id) => request(`/api/alerts/${id}/acknowledge`, { method: 'POST' }),
 

@@ -203,8 +203,8 @@ def main() -> int:
         print()
         if observation_count == 0:
             print("  No observations yet. Baselines are built from crowd_observations,")
-            print("  so run the processor first (uvicorn app.main:app, or")
-            print("  python -m scripts.run_demo) and let it collect some history.")
+            print("  so run the processor first (uvicorn app.main:app) and let it")
+            print("  collect some history.")
         else:
             print(f"  No slot reached {args.min_samples} samples. Either the history is")
             print("  still too short, or it is concentrated in a few hours. Lower")

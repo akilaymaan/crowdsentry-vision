@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Start camera workers when the API starts. Turn off for a pure-API process, or
-    # when running the processor separately (scripts/run_demo.py).
+    # when running the processor separately.
     realtime_enabled: bool = True
 
     # Process every Nth frame. Detection is the bottleneck: at ~60 ms/frame on CPU a

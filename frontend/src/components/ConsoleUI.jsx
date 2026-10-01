@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { CameraOff, Crosshair, Radio, ShieldCheck } from 'lucide-react'
 import RiskBadge from './RiskBadge'
-import { formatAgo, isFresh, riskColors } from '../lib/risk'
+import { cameraLiveState, formatAgo, isFresh, riskColors } from '../lib/risk'
 
 export function Status({ label, state = 'unknown' }) {
   return (
@@ -63,18 +63,24 @@ export function Skeleton({ label = 'Synchronizing telemetry' }) {
   )
 }
 
-function cameraState(camera, worker, freshnessSeconds = 120) {
-  if (!camera?.is_active) return 'Inactive'
-  if (!camera.stream_configured) return 'Not configured'
-  if (worker && worker.state !== 'running')
-    return (
-      { reconnecting: 'Reconnecting', failed: 'Offline', stopped: 'Stopped', starting: 'Starting' }[
-        worker.state
-      ] ?? 'Unknown'
-    )
-  return isFresh(camera.latest_observation?.timestamp, freshnessSeconds)
-    ? 'Reporting'
-    : 'Waiting for source'
+export function RangePicker({ options, value, onChange }) {
+  return (
+    <div className="range-picker">
+      {options.map((option) => (
+        <button
+          key={option.label}
+          type="button"
+          className={`range-picker__btn ${
+            option.label === value.label ? 'range-picker__btn--on' : ''
+          }`}
+          aria-pressed={option.label === value.label}
+          onClick={() => onChange(option)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export const CameraFeed = memo(function CameraFeed({
@@ -83,7 +89,7 @@ export const CameraFeed = memo(function CameraFeed({
   freshnessSeconds = 120,
   onInspect,
 }) {
-  const state = cameraState(camera, worker, freshnessSeconds)
+  const state = cameraLiveState(camera, worker, freshnessSeconds)
   const fresh = isFresh(camera?.latest_observation?.timestamp, freshnessSeconds)
   return (
     <section className="panel camera-feed" aria-label="Camera monitoring panel">

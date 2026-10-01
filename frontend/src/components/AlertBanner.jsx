@@ -1,19 +1,9 @@
-import { formatAgo, riskColors } from '../lib/risk'
+import { alertLevel, formatAgo, riskColors } from '../lib/risk'
 import './AlertBanner.css'
 
 /**
  * Unacknowledged alerts, newest first.
- *
- * Severity comes from the alert's own risk_level column. Rows written before that
- * column existed fall back to inferring it from the message text, where the backend
- * writes "CRITICAL crowd risk..." for critical and "High crowd risk..." otherwise.
  */
-function levelOf(alert) {
-  if (alert.risk_level === 'CRITICAL' || alert.risk_level === 'HIGH') {
-    return alert.risk_level
-  }
-  return alert.message?.startsWith('CRITICAL') ? 'CRITICAL' : 'HIGH'
-}
 
 export default function AlertBanner({ alerts, onAcknowledge, acknowledging, onSelectCamera }) {
   if (!alerts.length) {
@@ -25,7 +15,7 @@ export default function AlertBanner({ alerts, onAcknowledge, acknowledging, onSe
     )
   }
 
-  const critical = alerts.filter((alert) => levelOf(alert) === 'CRITICAL').length
+  const critical = alerts.filter((alert) => alertLevel(alert) === 'CRITICAL').length
 
   return (
     <section className="alerts panel" aria-live="polite">
@@ -39,7 +29,7 @@ export default function AlertBanner({ alerts, onAcknowledge, acknowledging, onSe
 
       <ul className="alerts__list">
         {alerts.map((alert, index) => {
-          const level = levelOf(alert)
+          const level = alertLevel(alert)
           const { fg, bg } = riskColors(level)
           const busy = acknowledging.has(alert.id)
 

@@ -79,5 +79,3 @@ data/raw/
 .DS_Store
 Thumbs.db
 
-# Alembic
-# (versions/ IS tracked - migrations are source code)

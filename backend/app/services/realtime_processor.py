@@ -511,7 +511,7 @@ class RealtimeProcessor:
         if not configs:
             logger.info(
                 "no active cameras with a stream_url; processor idle "
-                "(set cameras.stream_url and cameras.is_active, or run scripts/run_demo.py)"
+                "(set cameras.stream_url and cameras.is_active)"
             )
             self._running = True
             return

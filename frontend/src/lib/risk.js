@@ -21,7 +21,7 @@ export function riskColors(level) {
   return RISK_VARS[level] ?? UNKNOWN
 }
 
-export function severity(level) {
+function severity(level) {
   return SEVERITY[level] ?? -1
 }
 
@@ -36,6 +36,35 @@ export function highestLevel(levels) {
     if (level && severity(level) > severity(highest)) highest = level
   }
   return highest
+}
+
+/**
+ * Severity of one alert. Newer rows carry risk_level; older rows only wrote
+ * "CRITICAL crowd risk..." vs "High crowd risk..." in the message text.
+ */
+export function alertLevel(alert) {
+  if (alert.risk_level === 'CRITICAL' || alert.risk_level === 'HIGH') {
+    return alert.risk_level
+  }
+  return alert.message?.startsWith('CRITICAL') ? 'CRITICAL' : 'HIGH'
+}
+
+/**
+ * Operational state of one camera, derived from its status flags, its worker
+ * (when the processor reports one) and observation freshness.
+ */
+export function cameraLiveState(camera, worker, freshnessSeconds = 120) {
+  if (!camera?.is_active) return 'Inactive'
+  if (!camera.stream_configured) return 'Not configured'
+  if (worker && worker.state !== 'running')
+    return (
+      { reconnecting: 'Reconnecting', failed: 'Offline', stopped: 'Stopped', starting: 'Starting' }[
+        worker.state
+      ] ?? 'Unknown'
+    )
+  return isFresh(camera.latest_observation?.timestamp, freshnessSeconds)
+    ? 'Reporting'
+    : 'Waiting for source'
 }
 
 /* Formatting ------------------------------------------------------------- */

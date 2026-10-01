@@ -19,13 +19,9 @@ lap==0.5.13
 
 # --- Numerics / spatio-temporal analysis ---
 numpy==2.1.3
-scipy==1.15.1
 
 # --- Predictive risk modelling ---
-scikit-learn==1.6.1
 xgboost==2.1.3
-pandas==2.2.3
-matplotlib==3.10.0
 
-# Test-only dependencies live in requirements-dev.txt so production installs and
-# images stay lean.
+# Test-only dependencies live in requirements-dev.txt and the model-training
+# toolchain in requirements-train.txt, so production installs stay lean.

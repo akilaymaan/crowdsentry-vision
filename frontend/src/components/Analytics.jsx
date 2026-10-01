@@ -15,7 +15,7 @@ import {
 import { api } from '../api/client'
 import { useResource } from '../hooks/useResource'
 import { formatNumber, formatTime, riskColors, RISK_LEVELS } from '../lib/risk'
-import { EmptyState, MetricCard, SectionHeader, Skeleton } from './ConsoleUI'
+import { EmptyState, MetricCard, RangePicker, SectionHeader, Skeleton } from './ConsoleUI'
 
 const RANGES = [
   { label: '1H', hours: 1 },
@@ -184,18 +184,7 @@ export default function Analytics({ cameraId, compact = false, latestRisk }) {
           title="Risk timeline"
           subtitle="Measured model scores · shaded quartiles are guides, not classification thresholds"
           action={
-            <div className="range-picker" aria-label="History range">
-              {RANGES.map((option) => (
-                <button
-                  key={option.label}
-                  className={`range-picker__btn ${range === option ? 'range-picker__btn--on' : ''}`}
-                  aria-pressed={range === option}
-                  onClick={() => setRange(option)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <RangePicker options={RANGES} value={range} onChange={setRange} />
           }
         />
         {loading ? (

@@ -1,8 +1,8 @@
 """Tests for the REST and WebSocket API.
 
-The database is stubbed with a dependency override, so these run with no PostgreSQL and
+The database is stubbed with a dependency override, so these run with no MongoDB and
 no camera workers. They cover the response contracts and the routing/serialisation
-wiring; the queries themselves are exercised against the real database by hand.
+wiring; the queries themselves are exercised in test_api_database.py.
 """
 
 from __future__ import annotations

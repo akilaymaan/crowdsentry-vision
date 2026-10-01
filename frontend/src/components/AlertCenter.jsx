@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import { useResource } from '../hooks/useResource'
 import { EmptyState, Skeleton } from './ConsoleUI'
 import RiskBadge from './RiskBadge'
-import { formatTime } from '../lib/risk'
+import { alertLevel, formatTime } from '../lib/risk'
 
 export default function AlertCenter({
   cameras,
@@ -117,10 +117,7 @@ export default function AlertCenter({
             <article key={alert.id} className="alert-record">
               <div>
                 <RiskBadge
-                  level={
-                    alert.risk_level ??
-                    (alert.message?.startsWith('CRITICAL') ? 'CRITICAL' : 'HIGH')
-                  }
+                  level={alertLevel(alert)}
                   score={alert.risk_score}
                 />
                 <time dateTime={alert.timestamp}>

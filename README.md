@@ -46,7 +46,6 @@ CrowdSentry/
 │   ├── scripts/
 │   │   ├── seed.py          # sample cameras
 │   │   ├── simulate_crowd_scenarios.py  # social-force training data
-│   │   ├── run_demo.py      # run the pipeline on sample videos
 │   │   ├── test_detection.py# annotated detection run
 │   │   └── test_tracking.py # annotated tracking run
 │   ├── tests/
@@ -151,7 +150,8 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
-pip install -r requirements-dev.txt   # only needed to run the test suite
+pip install -r requirements-dev.txt    # only needed to run the test suite
+pip install -r requirements-train.txt  # only needed to train the risk model
 cp .env.example .env          # Windows: copy .env.example .env
 
 python -m scripts.seed        # insert 3 sample cameras
@@ -696,7 +696,7 @@ print(risk.risk_level, risk.risk_score, risk.confidence)
 for contribution in risk.top_features:
     print(contribution.feature, contribution.direction, contribution.contribution)
 
-row = risk.to_row(camera_id=2)          # persistable app.models.RiskScore
+doc = risk.to_doc(camera_id=2)          # persistable app.models.RiskScore document
 ```
 
 ### Building it
@@ -890,10 +890,10 @@ HIGH — so alerts are de-duplicated by three rules:
 Every line carries `key=value` context, greppable without a log pipeline:
 
 ```
-18:21:32 INFO  realtime  window scored   camera=DEMO-01-GATE level=CRITICAL score=65.73
+18:21:32 INFO  realtime  window scored   camera=CAM-01 level=CRITICAL score=65.73
                                          confidence=0.47 density=1.576 people=3.9
                                          stop_ratio=0.75 driver=flow_direction_variance ms=1354
-18:21:32 WARN  realtime  ALERT raised    camera=DEMO-01-GATE level=CRITICAL score=65.73
+18:21:32 WARN  realtime  ALERT raised    camera=CAM-01 level=CRITICAL score=65.73
 ```
 
 ### Resilience
@@ -903,39 +903,6 @@ A camera whose source fails is retried after `REALTIME_RESTART_DELAY_SECONDS`, u
 successful open resets the counter, so intermittent dropouts over hours do not accumulate.
 One camera failing never affects the others. A missing risk model stops that camera
 immediately rather than retrying — no amount of reconnecting will produce a model.
-
-### The demo runner
-
-```bash
-cd backend
-python -m scripts.run_demo                       # both sample clips, on loop
-python -m scripts.run_demo --duration 60
-python -m scripts.run_demo --area 2.5            # see the alerting path fire
-```
-
-It creates a `DEMO-*` camera per video file, points it at that file, runs the processor
-until Ctrl+C, then deactivates the demo cameras and prints what landed in the database.
-Video files loop, so short clips stand in for continuous feeds — and `_frame_index` keeps
-incrementing across the seam, so time never jumps backwards for velocity or windowing.
-
-The checked-in sample clips are `backend/data/samples/crowd.mp4` and
-`backend/data/samples/moving.mp4`. With the API running as a pure API process
-(`REALTIME_ENABLED=false`), run the video workers in another terminal:
-
-```bash
-cd backend
-python -m scripts.run_demo --videos data/samples/crowd.mp4 data/samples/moving.mp4 \
-  --duration 60 --area 2.5
-```
-
-The `--area 2.5` override makes the short clips dense enough to exercise HIGH/CRITICAL
-alerting; use the default area when you want a calmer occupancy demo.
-
-**On `--area`:** the stock sample clips hold 3-4 people, so at a realistic 45-60 m²
-footprint density stays around 0.07 ped/m² and never leaves LOW — the alerting path is
-never exercised. `--area 2.5` models a camera watching a tight doorway and pushes the same
-footage to HIGH/CRITICAL. The density is computed honestly from that number; it is the
-number itself that is a stand-in for a real measurement.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
