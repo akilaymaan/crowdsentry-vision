@@ -88,6 +88,9 @@ export const api = {
     return request(`/api/cameras/${id}/history?${params}`, { signal })
   },
 
+  setCameraActive: (id, active) =>
+    request(`/api/cameras/${id}/${active ? 'start' : 'stop'}`, { method: 'POST' }),
+
   openAlerts: (signal) => api.alerts({ acknowledged: false }, signal),
 
   acknowledgeAlert: (id) => request(`/api/alerts/${id}/acknowledge`, { method: 'POST' }),

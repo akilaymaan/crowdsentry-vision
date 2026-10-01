@@ -9,7 +9,9 @@ from pymongo.database import Database
 
 from app.core.database import CAMERAS, OBSERVATIONS, RISK_SCORES, ALERTS, get_db
 from app.models import Camera, CrowdObservation, RiskScore
+from app.services.realtime_processor import get_processor
 from app.schemas import (
+    CameraControlOut,
     CameraDetail,
     CameraHistory,
     CameraSummary,
@@ -112,6 +114,60 @@ def get_camera(camera_id: int, db: Database = Depends(get_db)) -> CameraDetail:
     )
     detail.unacknowledged_alerts = unacknowledged
     return detail
+
+
+@router.post(
+    "/{camera_id}/stop",
+    response_model=CameraControlOut,
+    summary="Stop monitoring one camera",
+)
+async def stop_camera(camera_id: int, db: Database = Depends(get_db)) -> CameraControlOut:
+    """Deactivate the camera and stop its worker, without stopping the API.
+
+    ``is_active`` is persisted, so the camera stays off across restarts. The
+    worker's frame thread unwinds at its next stop check -- typically the current
+    or next frame.
+    """
+    doc = db[CAMERAS].find_one({"id": camera_id})
+    if doc is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"No camera with id {camera_id}"
+        )
+
+    db[CAMERAS].update_one({"id": camera_id}, {"$set": {"is_active": False}})
+    worker = await get_processor().stop_camera(camera_id)
+    return CameraControlOut(
+        camera_id=camera_id,
+        is_active=False,
+        worker_state=worker.status.state if worker else None,
+    )
+
+
+@router.post(
+    "/{camera_id}/start",
+    response_model=CameraControlOut,
+    summary="Resume monitoring one camera",
+)
+async def start_camera(camera_id: int, db: Database = Depends(get_db)) -> CameraControlOut:
+    """Reactivate a stopped camera and start its worker immediately."""
+    doc = db[CAMERAS].find_one({"id": camera_id})
+    if doc is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"No camera with id {camera_id}"
+        )
+    if not Camera.from_doc(doc).stream_url:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Camera has no stream_url configured; set one before starting it.",
+        )
+
+    db[CAMERAS].update_one({"id": camera_id}, {"$set": {"is_active": True}})
+    worker = await get_processor().start_camera(camera_id)
+    return CameraControlOut(
+        camera_id=camera_id,
+        is_active=True,
+        worker_state=worker.status.state if worker else None,
+    )
 
 
 @router.get(

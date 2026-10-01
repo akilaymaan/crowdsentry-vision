@@ -445,6 +445,9 @@ class RealtimeProcessor:
         self.window_seconds = window_seconds
         self.workers: dict[int, CameraWorker] = {}
         self._running = False
+        # Serialises start_camera/stop_camera so an API call cannot race the
+        # lifecycle of the worker it is starting or stopping.
+        self._control_lock = asyncio.Lock()
 
     def _db(self):
         if self._db_factory is not None:
@@ -453,6 +456,20 @@ class RealtimeProcessor:
 
         return db
 
+    @staticmethod
+    def _config_for(camera: Camera) -> _CameraConfig | None:
+        """A worker config, or None when the camera has no feed configured."""
+        if not camera.stream_url:
+            return None
+        return _CameraConfig(
+            id=camera.id,
+            name=camera.name,
+            location_name=camera.location_name,
+            stream_url=camera.stream_url,
+            area_sq_meters=camera.area_sq_meters,
+            pixels_per_meter=camera.pixels_per_meter,
+        )
+
     def load_active_cameras(self) -> list[_CameraConfig]:
         """Cameras that are active and actually have a feed configured."""
         camera_docs = self._db()[CAMERAS].find({"is_active": True}).sort("id", 1)
@@ -460,24 +477,26 @@ class RealtimeProcessor:
         configs = []
         skipped = []
         for camera in (Camera.from_doc(doc) for doc in camera_docs):
-            if not camera.stream_url:
+            config = self._config_for(camera)
+            if config is None:
                 skipped.append(camera.name)
                 continue
-            configs.append(
-                _CameraConfig(
-                    id=camera.id,
-                    name=camera.name,
-                    location_name=camera.location_name,
-                    stream_url=camera.stream_url,
-                    area_sq_meters=camera.area_sq_meters,
-                    pixels_per_meter=camera.pixels_per_meter,
-                )
-            )
+            configs.append(config)
 
         if skipped:
             logger.info("skipping cameras with no stream_url", cameras=",".join(skipped))
 
         return configs
+
+    def load_camera_config(self, camera_id: int) -> _CameraConfig | None:
+        """Config for one active camera, or None when missing/inactive/unconfigured."""
+        doc = self._db()[CAMERAS].find_one({"id": camera_id})
+        if doc is None:
+            return None
+        camera = Camera.from_doc(doc)
+        if not camera.is_active:
+            return None
+        return self._config_for(camera)
 
     @staticmethod
     def _limit_torch_threads() -> None:
@@ -545,8 +564,54 @@ class RealtimeProcessor:
         self._running = False
         logger.info("processor stopped")
 
+    async def start_camera(self, camera_id: int) -> CameraWorker | None:
+        """Start (or return the running) worker for one active camera.
+
+        Returns None when the camera does not exist, is inactive, or has no
+        stream_url -- the caller translates that into an HTTP error. Idempotent:
+        starting an already-running camera just returns its worker.
+        """
+        async with self._control_lock:
+            worker = self.workers.get(camera_id)
+            if worker is not None:
+                return worker
+
+            config = await asyncio.to_thread(self.load_camera_config, camera_id)
+            if config is None:
+                return None
+
+            worker = CameraWorker(
+                config,
+                db_factory=self._db_factory,
+                loop_video=self.loop_video,
+                window_seconds=self.window_seconds,
+            )
+            self.workers[camera_id] = worker
+            await worker.start()
+            self._running = True
+            logger.info("camera worker started via control endpoint", camera=config.name)
+            return worker
+
+    async def stop_camera(
+        self, camera_id: int, timeout: float | None = None
+    ) -> CameraWorker | None:
+        """Stop one camera's worker without disturbing the others.
+
+        Returns the stopped worker, or None when the camera had no worker. The
+        stop itself happens outside the control lock so a slow unwind does not
+        block start/stop calls for other cameras.
+        """
+        async with self._control_lock:
+            worker = self.workers.pop(camera_id, None)
+
+        if worker is None:
+            return None
+        await worker.stop(timeout=timeout or settings.realtime_shutdown_timeout_seconds)
+        logger.info("camera worker stopped via control endpoint", camera=worker.config.name)
+        return worker
+
     async def wait(self) -> None:
-        """Block until every worker has finished. Used by the demo runner."""
+        """Block until every worker has finished. Used by tests."""
         tasks = [w._task for w in self.workers.values() if w._task is not None]
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)

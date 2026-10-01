@@ -127,6 +127,8 @@ def test_alert_with_camera_carries_the_camera_name():
         "/api/cameras",
         "/api/cameras/{camera_id}",
         "/api/cameras/{camera_id}/history",
+        "/api/cameras/{camera_id}/start",
+        "/api/cameras/{camera_id}/stop",
         "/api/alerts",
         "/api/alerts/{alert_id}/acknowledge",
         "/api/dashboard/summary",
@@ -177,6 +179,8 @@ def test_requests_are_open_when_no_api_key_is_configured(client):
 def test_api_requires_a_key_when_one_is_configured(secured_client):
     assert secured_client.get("/api/cameras").status_code == 401
     assert secured_client.post("/api/alerts/1/acknowledge").status_code == 401
+    assert secured_client.post("/api/cameras/1/start").status_code == 401
+    assert secured_client.post("/api/cameras/1/stop").status_code == 401
     assert secured_client.get("/api/dashboard/summary").status_code == 401
     assert secured_client.get("/api/processor/status").status_code == 401
 

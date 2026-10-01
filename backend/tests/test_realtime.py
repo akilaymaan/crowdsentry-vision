@@ -269,6 +269,12 @@ class _FakeCollection:
     def find(self, _query=None):
         return _FakeCursor(self._docs)
 
+    def find_one(self, query=None):
+        for doc in self._docs:
+            if all(doc.get(key) == value for key, value in (query or {}).items()):
+                return doc
+        return None
+
 
 class _FakeDb:
     """Minimal stand-in for a pymongo Database returning fixed camera docs."""
@@ -395,3 +401,61 @@ def test_stop_before_start_is_a_no_op():
     processor = RealtimeProcessor()
     asyncio.run(processor.stop())
     assert not processor.is_running
+
+
+# --------------------------------------------------------------------------------------
+# per-camera start/stop control
+# --------------------------------------------------------------------------------------
+
+
+def test_load_camera_config_filters_inactive_and_unconfigured():
+    cameras = [
+        _fake_camera_doc(1, "CAM-A", "rtsp://host/a"),
+        {**_fake_camera_doc(2, "CAM-B", "rtsp://host/b"), "is_active": False},
+        _fake_camera_doc(3, "CAM-C", None),
+    ]
+    processor = RealtimeProcessor(db_factory=lambda: _FakeDb(cameras))
+
+    assert processor.load_camera_config(1).name == "CAM-A"
+    assert processor.load_camera_config(2) is None  # inactive
+    assert processor.load_camera_config(3) is None  # no stream_url
+    assert processor.load_camera_config(99) is None  # missing
+
+
+def test_start_camera_spawns_a_worker_and_stop_removes_it(monkeypatch):
+    """The control path must manage one worker without touching the others."""
+    monkeypatch.setattr(settings, "realtime_restart_delay_seconds", 0.01)
+    # A path that fails fast, so the worker exercises the reconnect loop rather
+    # than blocking on a real source.
+    cameras = [_fake_camera_doc(1, "CAM-A", "does-not-exist.mp4")]
+    processor = RealtimeProcessor(db_factory=lambda: _FakeDb(cameras))
+
+    async def exercise():
+        worker = await processor.start_camera(1)
+        assert worker is not None
+        assert processor.is_running
+        assert 1 in processor.workers
+
+        # Idempotent: starting a running camera returns the same worker.
+        assert await processor.start_camera(1) is worker
+
+        stopped = await processor.stop_camera(1, timeout=5)
+        assert stopped is worker
+        assert 1 not in processor.workers
+        # Stopping a camera with no worker is a no-op, not an error.
+        assert await processor.stop_camera(99) is None
+
+    asyncio.run(exercise())
+
+
+def test_start_camera_returns_none_for_inactive_or_missing(monkeypatch):
+    monkeypatch.setattr(settings, "realtime_restart_delay_seconds", 0.01)
+    cameras = [{**_fake_camera_doc(1, "CAM-A", "rtsp://host/a"), "is_active": False}]
+    processor = RealtimeProcessor(db_factory=lambda: _FakeDb(cameras))
+
+    async def exercise():
+        assert await processor.start_camera(1) is None
+        assert await processor.start_camera(99) is None
+        assert processor.workers == {}
+
+    asyncio.run(exercise())

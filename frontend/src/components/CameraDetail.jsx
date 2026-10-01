@@ -12,7 +12,7 @@ import {
   YAxis,
 } from 'recharts'
 
-import { X } from 'lucide-react'
+import { Power, X } from 'lucide-react'
 import RiskBadge from './RiskBadge'
 import AlertCenter from './AlertCenter'
 import { HistoryChart } from './Analytics'
@@ -41,9 +41,12 @@ export default function CameraDetail({
   freshnessSeconds = 120,
   worker,
   onAcknowledged,
+  onCameraChanged,
 }) {
   const dialogRef = useRef(null)
   const [range, setRange] = useState(RANGES[1])
+  const [controlBusy, setControlBusy] = useState(false)
+  const [controlError, setControlError] = useState(null)
   const camera = cameras.find((entry) => entry.id === cameraId)
   const loader = useCallback(
     async (signal) => {
@@ -63,6 +66,26 @@ export default function CameraDetail({
   )
   const { data, loading, error, reload: load } = useResource(loader)
   const history = data?.history
+
+  /**
+   * Start/stop monitoring this camera. The endpoint flips is_active in the
+   * database and controls the worker live, so "off" survives an API restart.
+   */
+  async function toggleMonitoring() {
+    const active = (camera ?? detail)?.is_active
+    if (active == null) return
+    setControlBusy(true)
+    setControlError(null)
+    try {
+      await api.setCameraActive(cameraId, !active)
+      onCameraChanged?.()
+      load()
+    } catch (cause) {
+      setControlError(cause instanceof Error ? cause.message : 'Control request failed')
+    } finally {
+      setControlBusy(false)
+    }
+  }
   const detail = data?.detail
 
   // Escape closes, which is what anyone expects of an overlay.
@@ -166,10 +189,42 @@ export default function CameraDetail({
               )}
             </p>
           </div>
-          <button type="button" className="detail__close" onClick={onClose} aria-label="Close">
-            <X size={16} aria-hidden="true" />
-          </button>
+          <div className="detail__actions">
+            <button
+              type="button"
+              className={`button detail__power ${
+                (camera ?? detail)?.is_active ? 'detail__power--on' : ''
+              }`}
+              onClick={toggleMonitoring}
+              disabled={controlBusy || (camera ?? detail)?.is_active == null}
+              title={
+                (camera ?? detail)?.is_active
+                  ? 'Stop this camera without shutting down the API'
+                  : 'Resume monitoring on this camera'
+              }
+            >
+              <Power size={14} aria-hidden="true" />
+              {controlBusy
+                ? 'Applying…'
+                : (camera ?? detail)?.is_active
+                  ? 'Stop camera'
+                  : 'Start camera'}
+            </button>
+            <button
+              type="button"
+              className="detail__close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
         </header>
+        {controlError && (
+          <p className="detail__control-error" role="alert">
+            {controlError}
+          </p>
+        )}
 
         <div className="detail__feed">
           <CameraFeed

@@ -129,6 +129,18 @@ class CameraDetail(CameraBase):
     unacknowledged_alerts: int = 0
 
 
+class CameraControlOut(BaseModel):
+    """Result of a start/stop control call on one camera."""
+
+    camera_id: int
+    is_active: bool
+    worker_state: str | None = Field(
+        default=None,
+        description="Worker state after the call (starting/running/stopped); "
+        "null when the camera has no worker.",
+    )
+
+
 class CameraHistory(BaseModel):
     """Time-series for one camera, for charting.
 
@@ -258,6 +270,7 @@ __all__ = [
     "AlertListOut",
     "AlertOut",
     "AlertWithCamera",
+    "CameraControlOut",
     "CameraDetail",
     "CameraHistory",
     "CameraSummary",

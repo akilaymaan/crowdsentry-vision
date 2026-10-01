@@ -64,6 +64,41 @@
   color: var(--text-dim);
 }
 
+.detail__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail__power {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.detail__power--on {
+  border-color: color-mix(in srgb, var(--critical) 45%, transparent);
+  color: var(--critical);
+}
+
+.detail__power--on:hover {
+  background: color-mix(in srgb, var(--critical) 14%, transparent);
+}
+
+.detail__power:disabled {
+  opacity: 0.55;
+}
+
+.detail__control-error {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--critical);
+  font-size: 0.8rem;
+}
+
 .detail__close {
   flex: none;
   width: 1.9rem;

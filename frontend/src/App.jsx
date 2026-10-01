@@ -321,6 +321,10 @@ export default function App() {
             freshnessSeconds={freshnessSeconds}
             worker={system.data?.workers?.find((entry) => entry.camera_id === selectedId)}
             onAcknowledged={reload}
+            onCameraChanged={() => {
+              reload()
+              system.reload()
+            }}
           />
         </Suspense>
       )}
