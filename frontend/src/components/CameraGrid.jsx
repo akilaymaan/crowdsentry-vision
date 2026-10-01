@@ -1,3 +1,4 @@
+import { Video } from 'lucide-react'
 import RiskBadge from './RiskBadge'
 import { formatAgo, formatDensity, isFresh, riskColors } from '../lib/risk'
 import './CameraGrid.css'
@@ -8,8 +9,7 @@ export default function CameraGrid({ cameras, selectedId, onSelect, freshnessSec
       <section className="panel">
         <div className="panel-title">Cameras</div>
         <p className="empty">
-          No cameras registered. Register cameras in the cameras table to begin
-          monitoring.
+          No cameras registered. Register cameras in the cameras table to begin monitoring.
         </p>
       </section>
     )
@@ -44,7 +44,8 @@ function CameraCard({ camera, index, selected, onSelect, freshnessSeconds }) {
 
   // A camera that stopped reporting keeps its last reading in the database, but showing
   // that as the current state would misrepresent the venue. Grey it out instead.
-  const level = live ? risk?.risk_level : null
+  const riskFresh = live && isFresh(risk?.timestamp, freshnessSeconds)
+  const level = riskFresh ? risk?.risk_level : null
   const { fg } = riskColors(level)
 
   return (
@@ -69,7 +70,12 @@ function CameraCard({ camera, index, selected, onSelect, freshnessSeconds }) {
           <span className="camera-card__name">{camera.name}</span>
           <span className="camera-card__location">{camera.location_name}</span>
         </div>
-        <RiskBadge level={level} score={live ? risk?.risk_score : null} size="sm" />
+        <RiskBadge level={level} score={riskFresh ? risk?.risk_score : null} size="sm" />
+      </div>
+
+      <div className="camera-card__preview" aria-hidden="true">
+        <Video size={22} strokeWidth={1} />
+        <span>TELEMETRY SOURCE</span>
       </div>
 
       <div className="camera-card__metrics">
@@ -109,9 +115,7 @@ function Metric({ label, value, emphasis = false }) {
   return (
     <div className="metric">
       <span className="metric__label">{label}</span>
-      <span className={`metric__value mono ${emphasis ? 'metric__value--lg' : ''}`}>
-        {value}
-      </span>
+      <span className={`metric__value mono ${emphasis ? 'metric__value--lg' : ''}`}>{value}</span>
     </div>
   )
 }

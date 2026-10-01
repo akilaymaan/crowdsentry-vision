@@ -8,11 +8,12 @@
 // Explicit React import: the plugin's automatic JSX runtime does not cover this file
 // in the vitest pipeline, so JSX here compiles to React.createElement.
 import React from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from '../App'
+import { api } from '../api/client'
 
 const NOW = new Date().toISOString()
 const LONG_AGO = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
@@ -99,15 +100,43 @@ const ALERTS = {
 function mockApi(overrides = {}) {
   return vi.fn(async (url) => {
     const path = String(url)
-    const body = path.includes('/api/dashboard/summary')
-      ? (overrides.summary ?? SUMMARY)
-      : path.includes('/api/alerts')
-        ? (overrides.alerts ?? ALERTS)
-        : path.match(/\/api\/cameras\/\d+\/history/)
-          ? (overrides.history ?? { camera_id: 1, camera_name: 'CAM-01-NORTH-GATE', observations: [], risk_scores: [], truncated: false })
-          : path.match(/\/api\/cameras\/\d+$/)
-            ? (overrides.detail ?? { ...CAMERAS[0], unacknowledged_alerts: 1 })
-            : (overrides.cameras ?? CAMERAS)
+    const body = path.endsWith('/health/ready')
+      ? { status: 'ready' }
+      : path.endsWith('/health')
+        ? { status: 'ok' }
+        : path.includes('/api/processor/status')
+          ? {
+              running: true,
+              camera_count: 1,
+              cameras: [
+                {
+                  camera_id: 1,
+                  name: 'CAM-01-NORTH-GATE',
+                  state: 'reconnecting',
+                  frames_processed: 0,
+                  windows_processed: 0,
+                  alerts_raised: 0,
+                  last_window_at: null,
+                  stream_url: 'rtsp://private-value',
+                  last_error: 'private-error',
+                },
+              ],
+            }
+          : path.includes('/api/dashboard/summary')
+            ? (overrides.summary ?? SUMMARY)
+            : path.includes('/api/alerts')
+              ? (overrides.alerts ?? ALERTS)
+              : path.match(/\/api\/cameras\/\d+\/history/)
+                ? (overrides.history ?? {
+                    camera_id: 1,
+                    camera_name: 'CAM-01-NORTH-GATE',
+                    observations: [],
+                    risk_scores: [],
+                    truncated: false,
+                  })
+                : path.match(/\/api\/cameras\/\d+$/)
+                  ? (overrides.detail ?? { ...CAMERAS[0], unacknowledged_alerts: 1 })
+                  : (overrides.cameras ?? CAMERAS)
     return { ok: true, status: 200, json: async () => body }
   })
 }
@@ -115,6 +144,17 @@ function mockApi(overrides = {}) {
 beforeEach(() => {
   globalThis.__MockWebSocket.instances = []
   globalThis.fetch = mockApi()
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
+    width: 640,
+    height: 300,
+    top: 0,
+    left: 0,
+    right: 640,
+    bottom: 300,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  }))
 })
 
 /* Camera names appear twice by design — once on a card, once as a map marker — so every
@@ -140,9 +180,117 @@ function renderApp() {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  window.history.replaceState(null, '', window.location.pathname)
 })
 
 describe('dashboard', () => {
+  it('provides command-center navigation without losing the camera inventory', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    expect(await screen.findByRole('heading', { name: 'Command center' })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Cameras' }))
+    expect(await screen.findByRole('heading', { name: 'Camera network' })).toBeInTheDocument()
+    expect(screen.getByText('CAM-02-CONCOURSE')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Alerts' }))
+    expect(await screen.findByRole('heading', { name: 'Alert center' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Acknowledged' })).toBeInTheDocument()
+  })
+
+  it('preserves fetch aborts instead of converting them to network outages', async () => {
+    const abort = new DOMException('Aborted', 'AbortError')
+    globalThis.fetch = vi.fn(async () => {
+      throw abort
+    })
+    await expect(api.cameras(new AbortController().signal)).rejects.toBe(abort)
+  })
+
+  it('does not report StrictMode cleanup aborts as backend failures', async () => {
+    const original = mockApi()
+    globalThis.fetch = vi.fn(
+      (url, options) =>
+        new Promise((resolve, reject) => {
+          const timer = setTimeout(() => original(url, options).then(resolve), 10)
+          const abort = () => {
+            clearTimeout(timer)
+            reject(new DOMException('Aborted', 'AbortError'))
+          }
+          if (options?.signal?.aborted) abort()
+          else options?.signal?.addEventListener('abort', abort, { once: true })
+        }),
+    )
+    render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>,
+    )
+    expect(await screen.findByText(/2\/3 reporting/)).toBeInTheDocument()
+    expect(screen.queryByText(/cannot reach the backend/i)).not.toBeInTheDocument()
+  })
+
+  it('uses server-supported alert filters and preserves acknowledged records', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await screen.findByRole('heading', { name: 'Command center' })
+    await user.click(screen.getByRole('link', { name: 'Alerts' }))
+    await user.click(screen.getByRole('button', { name: 'Acknowledged' }))
+    await waitFor(() =>
+      expect(
+        globalThis.fetch.mock.calls.some(([url]) => String(url).includes('acknowledged=true')),
+      ).toBe(true),
+    )
+    await user.selectOptions(screen.getByLabelText('Camera'), '2')
+    await waitFor(() =>
+      expect(globalThis.fetch.mock.calls.some(([url]) => String(url).includes('camera_id=2'))).toBe(
+        true,
+      ),
+    )
+  })
+
+  it('shows verified system health without rendering stream specs or worker errors', async () => {
+    const user = userEvent.setup()
+    const { container } = renderApp()
+    await screen.findByRole('heading', { name: 'Command center' })
+    await user.click(screen.getByRole('link', { name: 'System' }))
+    expect(await screen.findByRole('heading', { name: 'System status' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'MongoDB readiness' })).toBeInTheDocument()
+    expect(globalThis.fetch.mock.calls.some(([url]) => url === '/health/ready')).toBe(true)
+    expect(container.textContent).not.toContain('rtsp://private-value')
+    expect(container.textContent).not.toContain('private-error')
+    expect(screen.getByRole('table')).toBeInTheDocument()
+  })
+
+  it('keeps the dashboard usable when the WebSocket disconnects', async () => {
+    renderApp()
+    await screen.findByRole('heading', { name: 'Command center' })
+    const socket = globalThis.__MockWebSocket.instances.at(-1)
+    await act(async () => {
+      socket.open()
+      socket.onclose({ code: 1006 })
+    })
+    expect(screen.getAllByText(/reconnecting/i).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/cannot reach the backend/i)).not.toBeInTheDocument()
+  })
+
+  it('renders analytics from returned history, not invented metrics', async () => {
+    const user = userEvent.setup()
+    globalThis.fetch = mockApi({
+      history: {
+        observations: [{ timestamp: NOW, density: 0.75, person_count: 3, mean_flow_speed: null }],
+        risk_scores: [{ timestamp: NOW, risk_score: 21, risk_level: 'LOW' }],
+        truncated: true,
+      },
+    })
+    renderApp()
+    await screen.findByRole('heading', { name: 'Command center' })
+    await user.click(screen.getByRole('link', { name: 'Analytics' }))
+    expect(await screen.findByText('0.75')).toBeInTheDocument()
+    expect(screen.getByText(/Recent 2,000 readings only/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '7D' }))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '7D' })).toHaveAttribute('aria-pressed', 'true'),
+    )
+  })
+
   it('renders the header, cameras, map and alerts from the API', async () => {
     const { findCard, mapSvg } = renderApp()
 
@@ -173,9 +321,8 @@ describe('dashboard', () => {
 
     // Two cameras reported recently; the third reported hours ago. Its 99 people must
     // not reach the headline count, which would otherwise read 107.
-    expect(await screen.findByText('2/3')).toBeInTheDocument()
+    expect(await screen.findByText(/2\/3 reporting · 1 not reporting/)).toBeInTheDocument()
     expect(screen.getByText('8')).toBeInTheDocument()
-    expect(screen.getByText('1 not reporting')).toBeInTheDocument()
   })
 
   it('shows a stale camera as having no current data', async () => {
@@ -195,18 +342,20 @@ describe('dashboard', () => {
     const callsBefore = globalThis.fetch.mock.calls.length
     const socket = globalThis.__MockWebSocket.instances.at(-1)
 
-    socket.emit({
-      type: 'risk_score',
-      camera_id: 2,
-      camera_name: 'CAM-02-CONCOURSE',
-      location_name: 'Upper Concourse',
-      timestamp: new Date().toISOString(),
-      risk_score: 88.4,
-      risk_level: 'CRITICAL',
-      person_count: 17.4,
-      density: 2.9,
-      top_feature: 'density',
-    })
+    act(() =>
+      socket.emit({
+        type: 'risk_score',
+        camera_id: 2,
+        camera_name: 'CAM-02-CONCOURSE',
+        location_name: 'Upper Concourse',
+        timestamp: new Date().toISOString(),
+        risk_score: 88.4,
+        risk_level: 'CRITICAL',
+        person_count: 17.4,
+        density: 2.9,
+        top_feature: 'density',
+      }),
+    )
 
     const card = await findCard('CAM-02-CONCOURSE')
     // 17.4 is a per-frame mean; the card shows a headcount.
@@ -216,9 +365,7 @@ describe('dashboard', () => {
 
     // A LOW/MODERATE event needs no refetch at all; this one is CRITICAL so it
     // triggers exactly one debounced alert re-read, not a full reload.
-    const newCalls = globalThis.fetch.mock.calls
-      .slice(callsBefore)
-      .map(([url]) => String(url))
+    const newCalls = globalThis.fetch.mock.calls.slice(callsBefore).map(([url]) => String(url))
     expect(newCalls.filter((url) => url.includes('/api/cameras'))).toHaveLength(0)
   })
 

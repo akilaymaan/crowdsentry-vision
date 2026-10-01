@@ -57,7 +57,7 @@ async function request(path, options = {}) {
   if (!response.ok) {
     if (response.status === 401) {
       throw new ApiError(
-        'The API rejected this dashboard\'s credentials. Check VITE_API_KEY matches the backend\'s API_KEY.',
+        "The API rejected this dashboard's credentials. Check VITE_API_KEY matches the backend's API_KEY.",
         401,
       )
     }
@@ -89,11 +89,18 @@ export const api = {
     return request(`/api/cameras/${id}/history?${params}`, { signal })
   },
 
-  openAlerts: (signal) =>
-    request('/api/alerts?acknowledged=false&limit=50', { signal }),
+  openAlerts: (signal) => request('/api/alerts?acknowledged=false&limit=50', { signal }),
 
-  acknowledgeAlert: (id) =>
-    request(`/api/alerts/${id}/acknowledge`, { method: 'POST' }),
+  acknowledgeAlert: (id) => request(`/api/alerts/${id}/acknowledge`, { method: 'POST' }),
 
+  alerts: ({ acknowledged, cameraId, limit = 50, offset = 0 } = {}, signal) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    if (acknowledged != null) params.set('acknowledged', String(acknowledged))
+    if (cameraId != null) params.set('camera_id', String(cameraId))
+    return request(`/api/alerts?${params}`, { signal })
+  },
+
+  health: (signal) => request('/health', { signal }),
+  readiness: (signal) => request('/health/ready', { signal }),
   processorStatus: (signal) => request('/api/processor/status', { signal }),
 }

@@ -20,7 +20,7 @@ export default function AlertBanner({ alerts, onAcknowledge, acknowledging, onSe
     return (
       <section className="alerts alerts--clear panel">
         <span className="alerts__clear-dot" />
-        <span>No active alerts — all monitored areas within normal risk.</span>
+        <span>No active alerts — no unacknowledged crowd-risk events. Non-reporting sources remain unobserved.</span>
       </section>
     )
   }

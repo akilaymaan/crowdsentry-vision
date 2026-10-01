@@ -65,8 +65,8 @@ export default function CrowdMap({ cameras, selectedId, onSelect, freshnessSecon
   return (
     <section className="panel map-panel">
       <div className="panel-title">
-        <span>Live crowd map</span>
-        {scaleMetres != null && (
+        <span>Source topology</span>
+        {scaleMetres != null && cameras.length > 1 && (
           <span className="muted mono">~{Math.round(scaleMetres)} m across</span>
         )}
       </div>
@@ -115,6 +115,7 @@ export default function CrowdMap({ cameras, selectedId, onSelect, freshnessSecon
           </svg>
         )}
       </div>
+      <p className="panel-note">Configured camera coordinates · not verified device geolocation.</p>
     </section>
   )
 }

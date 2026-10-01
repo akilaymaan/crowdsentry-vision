@@ -40,12 +40,14 @@ export function useDashboard() {
   // first fetch fails at the network level. Retry quietly on a timer rather than
   // stranding the operator on the error screen — mirrors the socket's reconnect loop.
   const retryTimer = useRef(null)
+  const loadController = useRef(null)
+  const loadVersion = useRef(0)
   useEffect(() => () => clearTimeout(retryTimer.current), [])
 
   const refreshAlerts = useCallback(async (signal) => {
     try {
       const data = await api.openAlerts(signal)
-      setAlerts(data.alerts ?? [])
+      if (!signal?.aborted) setAlerts(data.alerts ?? [])
     } catch (cause) {
       if (cause.name !== 'AbortError') console.warn('alert refresh failed', cause)
     }
@@ -53,7 +55,8 @@ export function useDashboard() {
 
   const refreshSummary = useCallback(async (signal) => {
     try {
-      setSummary(await api.summary(signal))
+      const data = await api.summary(signal)
+      if (!signal?.aborted) setSummary(data)
     } catch (cause) {
       if (cause.name !== 'AbortError') console.warn('summary refresh failed', cause)
     }
@@ -65,7 +68,8 @@ export function useDashboard() {
   // write, so a refresh cannot resurrect data the events already superseded.
   const refreshCameras = useCallback(async (signal) => {
     try {
-      setCameras(await api.cameras(signal))
+      const data = await api.cameras(signal)
+      if (!signal?.aborted) setCameras(data)
     } catch (cause) {
       if (cause.name !== 'AbortError') console.warn('camera refresh failed', cause)
     }
@@ -73,41 +77,45 @@ export function useDashboard() {
 
   /* Initial load ---------------------------------------------------------- */
 
-  const load = useCallback(
-    async (signal) => {
+  const load = useCallback(async function loadData(signal = loadController.current?.signal) {
+    if (signal?.aborted) return
+    const version = ++loadVersion.current
+    clearTimeout(retryTimer.current)
+    try {
+      const [summaryData, cameraData, alertData] = await Promise.all([
+        api.summary(signal),
+        api.cameras(signal),
+        api.openAlerts(signal),
+      ])
+      if (signal?.aborted || version !== loadVersion.current) return
+      clearTimeout(retryTimer.current)
       setError(null)
-      try {
-        const [summaryData, cameraData, alertData] = await Promise.all([
-          api.summary(signal),
-          api.cameras(signal),
-          api.openAlerts(signal),
-        ])
-        clearTimeout(retryTimer.current)
-        setError(null)
-        setSummary(summaryData)
-        setCameras(cameraData)
-        setAlerts(alertData.alerts ?? [])
-      } catch (cause) {
-        if (cause.name !== 'AbortError') {
-          setError(cause)
-          // status 0 = network-level failure: the API process is down or restarting.
-          // Retry on a timer; the retry cancels itself the moment a load succeeds.
-          if (cause.status === 0) {
-            clearTimeout(retryTimer.current)
-            retryTimer.current = setTimeout(() => load(), 4000)
-          }
+      setSummary(summaryData)
+      setCameras(cameraData)
+      setAlerts(alertData.alerts ?? [])
+    } catch (cause) {
+      if (!signal?.aborted && version === loadVersion.current && cause.name !== 'AbortError') {
+        setError(cause)
+        // status 0 = network-level failure: the API process is down or restarting.
+        // Retry on a timer; the retry cancels itself the moment a load succeeds.
+        if (cause.status === 0) {
+          clearTimeout(retryTimer.current)
+          retryTimer.current = setTimeout(() => loadData(), 4000)
         }
-      } finally {
-        setLoading(false)
       }
-    },
-    [],
-  )
+    } finally {
+      if (!signal?.aborted && version === loadVersion.current) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
-    load(controller.signal)
-    return () => controller.abort()
+    loadController.current = controller
+    queueMicrotask(() => load(controller.signal))
+    return () => {
+      controller.abort()
+      clearTimeout(retryTimer.current)
+    }
   }, [load])
 
   /* Live updates ---------------------------------------------------------- */
@@ -133,9 +141,12 @@ export function useDashboard() {
 
       setCameras((current) =>
         current.map((camera) =>
-          camera.id === event.camera_id
+          camera.id === event.camera_id &&
+          (!camera.latest_risk?.timestamp ||
+            new Date(event.timestamp) > new Date(camera.latest_risk.timestamp))
             ? {
                 ...camera,
+                previous_risk_score: camera.latest_risk?.risk_score,
                 latest_risk: {
                   timestamp: event.timestamp,
                   risk_score: event.risk_score,
@@ -166,35 +177,47 @@ export function useDashboard() {
   /* Periodic reconciliation ------------------------------------------------ */
 
   useEffect(() => {
-    const id = setInterval(() => {
-      const controller = new AbortController()
-      refreshSummary(controller.signal)
-      refreshAlerts(controller.signal)
-      refreshCameras(controller.signal)
+    const controller = new AbortController()
+    let busy = false
+    const id = setInterval(async () => {
+      if (busy) return
+      busy = true
+      await Promise.all([
+        refreshSummary(controller.signal),
+        refreshAlerts(controller.signal),
+        refreshCameras(controller.signal),
+      ])
+      busy = false
     }, RECONCILE_MS)
-    return () => clearInterval(id)
+    return () => {
+      controller.abort()
+      clearInterval(id)
+    }
   }, [refreshSummary, refreshAlerts, refreshCameras])
 
   /* Acknowledging ---------------------------------------------------------- */
 
-  const acknowledge = useCallback(async (alertId) => {
-    setAcknowledging((current) => new Set(current).add(alertId))
-    // Optimistic: drop it from the queue immediately so the button feels instant.
-    setAlerts((current) => current.filter((alert) => alert.id !== alertId))
-    try {
-      await api.acknowledgeAlert(alertId)
-    } catch (cause) {
-      console.warn('acknowledge failed', cause)
-      // Put it back — the operator needs to know it is still open.
-      await refreshAlerts()
-    } finally {
-      setAcknowledging((current) => {
-        const next = new Set(current)
-        next.delete(alertId)
-        return next
-      })
-    }
-  }, [refreshAlerts])
+  const acknowledge = useCallback(
+    async (alertId) => {
+      setAcknowledging((current) => new Set(current).add(alertId))
+      // Optimistic: drop it from the queue immediately so the button feels instant.
+      setAlerts((current) => current.filter((alert) => alert.id !== alertId))
+      try {
+        await api.acknowledgeAlert(alertId)
+      } catch (cause) {
+        console.warn('acknowledge failed', cause)
+        // Put it back — the operator needs to know it is still open.
+        await refreshAlerts()
+      } finally {
+        setAcknowledging((current) => {
+          const next = new Set(current)
+          next.delete(alertId)
+          return next
+        })
+      }
+    },
+    [refreshAlerts],
+  )
 
   /* Derived header figures -------------------------------------------------- */
 
@@ -247,6 +270,9 @@ export function useDashboard() {
     lastEventAt,
     acknowledging,
     acknowledge,
-    reload: () => load(),
+    reload: () => {
+      setError(null)
+      load()
+    },
   }
 }

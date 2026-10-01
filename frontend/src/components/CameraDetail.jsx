@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Area,
   CartesianGrid,
@@ -12,9 +12,14 @@ import {
   YAxis,
 } from 'recharts'
 
+import { X } from 'lucide-react'
 import RiskBadge from './RiskBadge'
+import AlertCenter from './AlertCenter'
+import { HistoryChart } from './Analytics'
+import { CameraFeed, SectionHeader } from './ConsoleUI'
 import { api } from '../api/client'
-import { formatAgo, formatDensity, formatTime, riskColors } from '../lib/risk'
+import { useResource } from '../hooks/useResource'
+import { formatAgo, formatDensity, formatTime, isFresh, riskColors } from '../lib/risk'
 import './CameraDetail.css'
 
 const RANGES = [
@@ -28,52 +33,68 @@ const RANGES = [
 // so a reading has a reference point rather than being a bare number.
 const LOS_E_DENSITY = 1.08
 
-export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamera }) {
+export default function CameraDetail({
+  cameraId,
+  cameras,
+  onClose,
+  onSelectCamera,
+  freshnessSeconds = 120,
+  worker,
+  onAcknowledged,
+}) {
+  const dialogRef = useRef(null)
   const [range, setRange] = useState(RANGES[1])
-  const [history, setHistory] = useState(null)
-  const [detail, setDetail] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
   const camera = cameras.find((entry) => entry.id === cameraId)
-
-  const load = useCallback(
+  const loader = useCallback(
     async (signal) => {
-      setLoading(true)
-      setError(null)
-      try {
-        const to = new Date()
-        const from = new Date(to.getTime() - range.minutes * 60_000)
-        const [historyData, detailData] = await Promise.all([
-          api.cameraHistory(
-            cameraId,
-            { from: from.toISOString(), to: to.toISOString(), limit: 2000 },
-            signal,
-          ),
-          api.camera(cameraId, signal),
-        ])
-        setHistory(historyData)
-        setDetail(detailData)
-      } catch (cause) {
-        if (cause.name !== 'AbortError') setError(cause)
-      } finally {
-        setLoading(false)
-      }
+      const to = new Date()
+      const from = new Date(to.getTime() - range.minutes * 60_000)
+      const [history, detail] = await Promise.all([
+        api.cameraHistory(
+          cameraId,
+          { from: from.toISOString(), to: to.toISOString(), limit: 2000 },
+          signal,
+        ),
+        api.camera(cameraId, signal),
+      ])
+      return { history, detail }
     },
     [cameraId, range],
   )
-
-  useEffect(() => {
-    const controller = new AbortController()
-    load(controller.signal)
-    return () => controller.abort()
-  }, [load])
+  const { data, loading, error, reload: load } = useResource(loader)
+  const history = data?.history
+  const detail = data?.detail
 
   // Escape closes, which is what anyone expects of an overlay.
   useEffect(() => {
-    const onKey = (event) => event.key === 'Escape' && onClose()
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector('button')?.focus()
+    const onKey = (event) => {
+      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Tab') return
+      const controls = [
+        ...(dialogRef.current?.querySelectorAll(
+          'button:not(:disabled), a[href], select, [tabindex="0"]',
+        ) ?? []),
+      ]
+      const first = controls[0]
+      const last = controls.at(-1)
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last?.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first?.focus()
+      }
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus()
+    }
   }, [onClose])
 
   /**
@@ -107,13 +128,26 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
     return [...byTime.values()].sort((a, b) => a.time - b.time)
   }, [history])
 
-  const latestRisk = camera?.latest_risk ?? detail?.latest_risk
-  const observation = detail?.latest_observation
+  const candidateRisk = camera?.latest_risk ?? detail?.latest_risk
+  const latestRisk = isFresh(candidateRisk?.timestamp, freshnessSeconds) ? candidateRisk : null
+  const observation = isFresh(detail?.latest_observation?.timestamp, freshnessSeconds)
+    ? detail.latest_observation
+    : null
+  const dynamics = useMemo(
+    () =>
+      (history?.observations ?? []).map((entry) => ({
+        ...entry,
+        time: new Date(entry.timestamp).getTime(),
+        stopped_percent: entry.stop_ratio == null ? null : entry.stop_ratio * 100,
+      })),
+    [history],
+  )
 
   return (
     <div className="detail-backdrop" onClick={onClose} role="presentation">
       <aside
         className="detail"
+        ref={dialogRef}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -123,11 +157,7 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
           <div>
             <div className="detail__title-row">
               <h2 className="detail__title">{camera?.name ?? detail?.name ?? 'Camera'}</h2>
-              <RiskBadge
-                level={latestRisk?.risk_level}
-                score={latestRisk?.risk_score}
-                size="lg"
-              />
+              <RiskBadge level={latestRisk?.risk_level} score={latestRisk?.risk_score} size="lg" />
             </div>
             <p className="detail__location">
               {camera?.location_name ?? detail?.location_name}
@@ -137,9 +167,17 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
             </p>
           </div>
           <button type="button" className="detail__close" onClick={onClose} aria-label="Close">
-            ✕
+            <X size={16} aria-hidden="true" />
           </button>
         </header>
+
+        <div className="detail__feed">
+          <CameraFeed
+            camera={camera ?? detail}
+            worker={worker}
+            freshnessSeconds={freshnessSeconds}
+          />
+        </div>
 
         <div className="detail__stats">
           <DetailStat label="People" value={observation?.person_count ?? '—'} />
@@ -158,9 +196,7 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
           <DetailStat
             label="Stopped"
             value={
-              observation?.stop_ratio != null
-                ? `${Math.round(observation.stop_ratio * 100)}%`
-                : '—'
+              observation?.stop_ratio != null ? `${Math.round(observation.stop_ratio * 100)}%` : '—'
             }
           />
           <DetailStat
@@ -171,7 +207,7 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
                 : 'no baseline'
             }
           />
-          <DetailStat label="Open alerts" value={detail?.unacknowledged_alerts ?? 0} />
+          <DetailStat label="Open alerts" value={detail?.unacknowledged_alerts ?? '—'} />
         </div>
 
         <div className="detail__chart-head">
@@ -194,7 +230,14 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
 
         <div className="detail__chart">
           {loading && <p className="empty">Loading history…</p>}
-          {error && <p className="empty">Could not load history: {error.message}</p>}
+          {error && (
+            <div className="resource-error" role="alert">
+              <p>Could not load camera history.</p>
+              <button className="button" onClick={() => load()}>
+                Retry history
+              </button>
+            </div>
+          )}
           {!loading && !error && series.length === 0 && (
             <p className="empty">
               No data in the last {range.label}. Start the processor for this camera.
@@ -259,10 +302,7 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
                 />
 
                 <Tooltip content={<ChartTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
-                  iconType="plainline"
-                />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconType="plainline" />
 
                 <Area
                   yAxisId="density"
@@ -298,17 +338,37 @@ export default function CameraDetail({ cameraId, cameras, onClose, onSelectCamer
           </p>
         )}
 
+        <div className="detail__dynamics">
+          <section className="panel">
+            <SectionHeader title="Flow dynamics" subtitle="Calibrated speed in metres per second" />
+            <HistoryChart rows={dynamics} field="mean_flow_speed" label="Flow speed" unit="m/s" />
+          </section>
+          <section className="panel">
+            <SectionHeader
+              title="Stopped people"
+              subtitle="Observed stop ratio, not an incident count"
+            />
+            <HistoryChart rows={dynamics} field="stopped_percent" label="Stopped people" unit="%" />
+          </section>
+        </div>
+        <div className="detail__alerts">
+          <SectionHeader title="Recent camera alerts" />
+          <AlertCenter
+            key={cameraId}
+            cameras={cameras}
+            cameraId={cameraId}
+            onSelectCamera={onSelectCamera}
+            onAcknowledged={onAcknowledged}
+          />
+        </div>
+
         <footer className="detail__foot">
           <span className="muted">
             {camera?.pixels_per_meter
               ? `${camera.pixels_per_meter} px/m calibrated`
               : 'Not calibrated — speeds unavailable'}
           </span>
-          <NeighbourLinks
-            cameras={cameras}
-            currentId={cameraId}
-            onSelectCamera={onSelectCamera}
-          />
+          <NeighbourLinks cameras={cameras} currentId={cameraId} onSelectCamera={onSelectCamera} />
         </footer>
       </aside>
     </div>

@@ -10,7 +10,9 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 .detail {
@@ -26,7 +28,10 @@
 }
 
 @keyframes slide-in {
-  from { transform: translateX(48px); opacity: 0.4; }
+  from {
+    transform: translateX(48px);
+    opacity: 0.4;
+  }
 }
 
 .detail__head {
@@ -69,7 +74,10 @@
   color: var(--text-dim);
   font-size: 0.8rem;
   line-height: 1;
-  transition: color 0.15s, border-color 0.15s, transform 0.1s;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
 }
 
 .detail__close:hover {
@@ -100,14 +108,27 @@
   animation: stat-in 0.35s var(--ease-out) backwards;
 }
 
-.detail-stat:nth-child(2) { animation-delay: 0.04s; }
-.detail-stat:nth-child(3) { animation-delay: 0.08s; }
-.detail-stat:nth-child(4) { animation-delay: 0.12s; }
-.detail-stat:nth-child(5) { animation-delay: 0.16s; }
-.detail-stat:nth-child(6) { animation-delay: 0.2s; }
+.detail-stat:nth-child(2) {
+  animation-delay: 0.04s;
+}
+.detail-stat:nth-child(3) {
+  animation-delay: 0.08s;
+}
+.detail-stat:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.detail-stat:nth-child(5) {
+  animation-delay: 0.16s;
+}
+.detail-stat:nth-child(6) {
+  animation-delay: 0.2s;
+}
 
 @keyframes stat-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .detail-stat__label {
@@ -156,7 +177,10 @@
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--text-faint);
-  transition: background 0.15s, color 0.15s, transform 0.1s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    transform 0.1s;
 }
 
 .range-picker__btn:hover {
@@ -242,7 +266,10 @@
   background: var(--surface-3);
   font-size: 0.7rem;
   color: var(--text-dim);
-  transition: border-color 0.15s, color 0.15s, transform 0.12s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.12s;
 }
 
 .detail__neighbour:hover {
@@ -262,7 +289,34 @@
   background: var(--n);
 }
 
+.detail__feed {
+  padding: 18px;
+}
+.detail__feed .camera-feed__viewport {
+  min-height: 240px;
+}
+.detail__dynamics {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.detail__alerts {
+  padding: 0 18px 24px;
+}
+.detail__close {
+  display: grid;
+  place-items: center;
+}
+
 @media (max-width: 760px) {
-  .detail { width: 100%; }
-  .detail__chart { height: 16rem; }
+  .detail__dynamics {
+    grid-template-columns: 1fr;
+  }
+  .detail {
+    width: 100%;
+  }
+  .detail__chart {
+    height: 16rem;
+  }
 }
