@@ -154,7 +154,7 @@ pip install -r requirements-dev.txt    # only needed to run the test suite
 pip install -r requirements-train.txt  # only needed to train the risk model
 cp .env.example .env          # Windows: copy .env.example .env
 
-python -m scripts.seed        # insert 3 sample cameras
+python -m scripts.seed        # insert the dev camera (laptop webcam)
 
 # Build model artifacts if ml_artifacts/risk_model.json is not present.
 python -m scripts.simulate_crowd_scenarios
@@ -546,7 +546,7 @@ cd backend
 python -m scripts.test_tracking --source data/samples/crowd.mp4
 
 # pull calibration from a seeded camera row
-python -m scripts.test_tracking --source data/samples/crowd.mp4 --camera CAM-02-CONCOURSE
+python -m scripts.test_tracking --source data/samples/crowd.mp4 --camera CAM-1
 
 # or state it directly
 python -m scripts.test_tracking --source data/samples/crowd.mp4 --pixels-per-meter 52
@@ -996,7 +996,7 @@ ws.onmessage = (e) => {
 
 ```
 ->  {"type": "hello", "server_time": "...", "subscribers": 1, "cameras": [...]}
-->  {"type": "risk_score", "camera_id": 2, "camera_name": "CAM-02-CONCOURSE",
+->  {"type": "risk_score", "camera_id": 1, "camera_name": "CAM-1",
      "timestamp": "...", "risk_score": 71.69, "risk_level": "CRITICAL",
      "person_count": 3.21, "density": 1.2857, "top_feature": "density"}
 ->  {"type": "keepalive"}          every 25s when idle

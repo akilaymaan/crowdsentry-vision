@@ -9,7 +9,7 @@ Usage (from backend/, with the venv active):
     python -m scripts.compute_baselines
     python -m scripts.compute_baselines --dry-run
     python -m scripts.compute_baselines --days 14 --min-samples 3
-    python -m scripts.compute_baselines --camera CAM-02-CONCOURSE
+    python -m scripts.compute_baselines --camera CAM-1
     python -m scripts.compute_baselines --exclude-alerting
 
 Scheduling

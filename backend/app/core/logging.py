@@ -4,7 +4,7 @@ Log lines carry machine-readable ``key=value`` context after the message, so per
 processing can be followed by eye in the console *and* grepped or parsed without a log
 pipeline::
 
-    18:42:07 INFO     realtime      window scored  camera=CAM-02-CONCOURSE level=HIGH
+    18:42:07 INFO     realtime      window scored  camera=CAM-1 level=HIGH
                                                    score=64.2 density=1.412 people=17
 
 Use :func:`get_logger` for a plain logger and :meth:`StructuredLogger.bind` to attach

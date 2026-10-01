@@ -1,4 +1,4 @@
-"""Seed the database with sample cameras for local development.
+"""Seed the database with the development camera (the laptop webcam).
 
 Usage (from the backend/ directory, with the venv active and MongoDB reachable):
 
@@ -29,37 +29,18 @@ from app.core.database import (
     utcnow,
 )
 
-# Three venues with genuinely different crowd dynamics, so the risk model has
-# contrasting baselines to work against. Coordinates are around Bengaluru.
+# The development setup has one camera: the laptop webcam (device index 0).
+# pixels_per_meter stays None -- without calibration, speeds report in px/s rather
+# than a fabricated m/s figure. Coordinates are the dev machine's approximate area.
 SAMPLE_CAMERAS: list[dict] = [
     {
-        "name": "CAM-01-NORTH-GATE",
-        "location_name": "Stadium North Gate - Main Entry",
+        "name": "CAM-1",
+        "location_name": "Laptop webcam",
         "latitude": 12.978900,
         "longitude": 77.599800,
-        # Wide funnel approach; bursty inflow around gate-opening time.
-        "area_sq_meters": 450.0,
-        # Placeholder calibration -- measure a known distance in each camera's own
-        # footage and set this properly before trusting any m/s figure.
-        "pixels_per_meter": 38.0,
-    },
-    {
-        "name": "CAM-02-CONCOURSE",
-        "location_name": "Stadium Upper Concourse - Section B",
-        "latitude": 12.979350,
-        "longitude": 77.600450,
-        # Circulation corridor; sustained bidirectional flow at half-time.
-        "area_sq_meters": 280.0,
-        "pixels_per_meter": 52.0,
-    },
-    {
-        "name": "CAM-03-METRO-EXIT",
-        "location_name": "Metro Station Exit C - Pedestrian Plaza",
-        "latitude": 12.976100,
-        "longitude": 77.603200,
-        # Open plaza, but the narrow stair mouth makes it a pinch point on egress.
-        "area_sq_meters": 620.0,
-        "pixels_per_meter": 26.0,
+        "area_sq_meters": 10.0,
+        "pixels_per_meter": None,
+        "stream_url": "0",
     },
 ]
 
@@ -69,7 +50,7 @@ CHILD_COLLECTIONS = [OBSERVATIONS, RISK_SCORES, ALERTS, BASELINES]
 
 
 def seed(reset: bool = False) -> int:
-    """Insert or update the sample cameras. Returns the number of cameras written."""
+    """Insert or update the development camera. Returns the number of cameras written."""
     ensure_indexes()
     written = 0
 
@@ -92,7 +73,6 @@ def seed(reset: bool = False) -> int:
                 "$setOnInsert": {
                     "id": next_id(db, CAMERAS),
                     "is_active": True,
-                    "stream_url": None,
                     "created_at": utcnow(),
                 },
             },
@@ -122,7 +102,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    print("Seeding CrowdSentry sample cameras...")
+    print("Seeding CrowdSentry development camera...")
     try:
         count = seed(reset=args.reset)
     except PyMongoError as exc:

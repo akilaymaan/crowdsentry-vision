@@ -7,7 +7,7 @@ Usage (from backend/, with the venv active):
 
     python -m scripts.test_tracking --source data/samples/crowd.mp4
     python -m scripts.test_tracking --source data/samples/crowd.mp4 --pixels-per-meter 42
-    python -m scripts.test_tracking --source data/samples/crowd.mp4 --camera CAM-02-CONCOURSE
+    python -m scripts.test_tracking --source data/samples/crowd.mp4 --camera CAM-1
     python -m scripts.test_tracking --source 0 --max-frames 200        # webcam
 
 What to look for in the output:
